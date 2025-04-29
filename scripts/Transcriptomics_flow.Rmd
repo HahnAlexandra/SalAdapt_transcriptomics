@@ -1,0 +1,204 @@
+---
+title: "Transcriptomics"
+author: "AH"
+date: "2024-05-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Before loading environments, source private conda installation
+```{bash}
+source $HOME/miniconda3/usr/etc/profile.d/conda.sh
+conda activate <ENVIRONMENT>
+````
+
+Download data and check MD5sums --> all OK
+Checked fastqc in one sample folder
+```{bash}
+srun --nodes=1 --tasks-per-node=1 --cpus-per-task=2 --mem=2G --time=00:05:00 fastqc -t 2 -o ../../02.QC ./*.fq.gz
+```
+
+Submit to SLURM --> FastQC.sh
+fastqc does not take stdin --> use xargs to pass arguments 
+```{bash}
+#!/bin/bash
+#SBATCH --job-name=FastQC
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=20G
+#SBATCH --time=00:30:00
+#SBATCH --output=fastqc.out
+#SBATCH --error=fastqc.err
+
+cd $WORK/transcriptomics/data/X208SC24034727-Z01-F001/01.RawData
+
+find . -name "*fq.gz" -print0 | xargs -0 -P 10 fastqc -t 10 -o ../02.QC
+```
+
+Summarize FastQC output with MultiQC 
+```{bash}
+multiqc .
+```
+--> download .html file with scp 
+
+Running Fastp for adapter trimming --> Trimming.sh
+```{bash}
+#!/bin/bash
+#SBATCH --job-name=FastP
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=60G
+#SBATCH --time=02:00:00
+#SBATCH --output=fastp.out
+#SBATCH --error=fastp.err
+
+cd $WORK/transcriptomics/data/X208SC24034727-Z01-F001/01.RenamedData
+
+for NAME in $(ls | cut -f 1-6 -d "_" | sort | uniq); do
+
+  BASENAME=$(echo $NAME | cut -f 2,3,6 -d "_")
+
+  fastp -w 10 -Q -g -i ${NAME}_1.fq.gz -I ${NAME}_2.fq.gz -o ../03.Trimming/${BASENAME}_1.trim.fq.gz -O ../03.Trimming/${BASENAME}_2.trim.fq.gz
+
+done
+
+```
+
+Rerun FastQC and MultiQC on trimmed data (ca. 20 min) --> FastQC_trimmed.sh
+```{bash}
+#!/bin/bash
+#SBATCH --job-name=FastQC
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=20G
+#SBATCH --time=00:30:00
+#SBATCH --output=fastqc_trimmed.out
+#SBATCH --error=fastqc_trimmed.err
+
+cd $WORK/transcriptomics/data/X208SC24034727-Z01-F001/03.Trimming
+
+fastqc -t 10 -o . *.trim.fq.gz
+
+multiqc .
+```
+
+Make index for salmon --> Salmon_indexing.sh
+```{bash}
+#!/bin/bash
+#SBATCH -D /gxfs_home/geomar/smomw629/transcriptomics/log-files
+#SBATCH --job-name=salmon_index
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=80G
+#SBATCH --time=24:00:00
+#SBATCH --output=%x.%A.out
+#SBATCH --error=%x.%A.err
+#SBATCH --partition=base
+
+salmon index -t $WORK/transcriptomics/tonsa_transcriptome/trinity.trimmomatic.above500.noPhiX.fasta.gz -i $WORK/transcriptomics/tonsa_transcriptome/salmon_index -k 31
+````
+
+Mapping reads with salmon --> Salmon_quantification.sh
+```{bash}
+#!/bin/bash
+#SBATCH -D /gxfs_home/geomar/smomw629/transcriptomics/log-files
+#SBATCH --job-name=salmon_quant
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=80G
+#SBATCH --time=48:00:00
+#SBATCH --output=%x.%A.out
+#SBATCH --error=%x.%A.err
+#SBATCH --partition=base
+
+cd $WORK/transcriptomics/data/X208SC24034727-Z01-F001/03.Trimming
+
+for READ in $(ls | cut -f 1-3 -d "_" | sort | uniq); do
+
+  salmon quant -i $WORK/transcriptomics/tonsa_transcriptome/salmon_index \
+  -l A \
+  -1 ${READ}_1.trim.fq.gz -2 ${READ}_2.trim.fq.gz \
+  --seqBias \
+  --gcBias \
+  -p 16 \
+  -o ../04.Alignment/${READ}_quant
+
+done
+
+#loop test with echo successful
+#test with srun (ran really fast? ~ 1 min)
+#might be normal https://learn.gencore.bio.nyu.edu/rna-seq-analysis/salmon-kallisto-rapid-transcript-quantification-for-rna-seq-data/
+
+
+```
+
+Make salmon output ready for DeSeq2
+```{R}
+#install packages
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("rtracklayer")#could not be installed on HPC
+BiocManager::install("tximport")
+BiocManager::install("DESeq2")#could not be installed on HPC
+BiocManager::install("readr")
+
+#load packages
+
+#for cluster 
+.libPaths(c("/gxfs_home/geomar/smomw629/R/x86_64-pc-linux-gnu-library/4.3/"))
+
+library(rtracklayer)#could not be installed on HPC
+library(tximport)
+library(DESeq2)#could not be installed on HPC
+library(readr)
+library(dplyr)
+
+#transcript to gene mapping (did this off cluster)
+gff_file <- "blast2go_gff_export_20170613_0815.gff.gz"
+gff <- import(gff_file)
+
+#convert to data frame
+gff_df <- as.data.frame(gff) %>%
+  dplyr::filter(type == "CDS") %>%
+  dplyr::select(seqnames, start, end, strand, ID, Description, Gene) %>%
+  dplyr::mutate(
+    transcript_id = sapply(strsplit(as.character(ID), " "), `[`, 1),
+    gene_id = sapply(strsplit(as.character(Gene), ";"), `[`, 1)
+  )
+
+#create tx2gene data frame
+tx2gene <- gff_df %>%
+  dplyr::select(transcript_id, gene_id) %>%
+  unique()
+
+#save to csv
+#upload to HPC
+##move to HPC
+
+#prepare sample metadata and file paths
+samples <- read.csv("/gxfs_work/geomar/smomw629/transcriptomics/data/X208SC24034727-Z01-F001/samples_v3.csv")
+#removed low sequence lanes in samples_v2.csv
+files <- file.path(samples$salmon_path)
+names(files) <- samples$sample
+
+# --> replace NA with "unknown_gene"
+#tx2gene is in tonsa_transcriptome folder
+tx2gene <- read.csv("/gxfs_work/geomar/smomw629/transcriptomics/tonsa_transcriptome/Atonsa_transcript_to_gene")
+
+txi <- tximport(files, type = "salmon", tx2gene = Atonsa_transcript_to_gene)
+names(txi)
+
+#save new txi file 
+saveRDS(file = "txi_2.rds")
+
+#not on HPC
+#--> Transcriptomic_analysis.R
