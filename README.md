@@ -4,4 +4,4 @@ Salinity_analysis.R contains script to generate salinity maps and calculate mean
 
 Physiology_analysis.R contains script for analysing physiological data, find data files [here](/data)
 
-Transcriptomic_analysis.R contains script for analysing pre-processed transcriptomic data, find raw files on NCBI
+Transcriptomic_analysis.R contains script for analysing pre-processed transcriptomic data, find raw files on NCBI, find scripts for data processing [here](/scripts)
