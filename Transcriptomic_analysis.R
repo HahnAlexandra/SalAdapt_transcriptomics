@@ -386,6 +386,22 @@ salgenes_combined <- union(salgenes_SW08, salgenes_WH)#602
 #of combined genes 516 overlap with LRT salinity genes
 salgenes_LRT_pair <- intersect(salgenes_combined, sig_genes_salinity)#516
 
+#load annotation file
+gff_file <- "blast2go_gff_export_20170613_0815.gff.gz"
+gff <- import(gff_file)
+
+#convert to data frame
+gff_df <- as.data.frame(gff) %>%
+  dplyr::filter(type == "CDS") %>%
+  dplyr::select(seqnames, start, end, strand, ID, Description, Gene) %>%
+  dplyr::mutate(
+    transcript_id = sapply(strsplit(as.character(ID), " "), `[`, 1),
+    gene_id = sapply(strsplit(as.character(Gene), ";"), `[`, 1)
+  )
+
+gff_df <- gff_df %>%
+  mutate(TRINITY = sub("_i[0-9]+$", "", ID))
+
 allgenes_dds_gene_names <- gff_df %>%
   filter(TRINITY %in% dds_int_allgenes)%>%
   distinct(TRINITY, .keep_all = TRUE)%>%
@@ -425,21 +441,6 @@ lfc_SW08_t2 <- extract_lfc(res_SW08_sal2, "lfc_SW08_t2")
 lfc_WH_t1 <- extract_lfc(res_WH_sal1, "lfc_WH_t1")
 lfc_WH_t2 <- extract_lfc(res_WH_sal2, "lfc_WH_t2")
 
-#load annotation file
-gff_file <- "blast2go_gff_export_20170613_0815.gff.gz"
-gff <- import(gff_file)
-
-#convert to data frame
-gff_df <- as.data.frame(gff) %>%
-  dplyr::filter(type == "CDS") %>%
-  dplyr::select(seqnames, start, end, strand, ID, Description, Gene) %>%
-  dplyr::mutate(
-    transcript_id = sapply(strsplit(as.character(ID), " "), `[`, 1),
-    gene_id = sapply(strsplit(as.character(Gene), ";"), `[`, 1)
-  )
-
-gff_df <- gff_df %>%
-  mutate(TRINITY = sub("_i[0-9]+$", "", ID))
 
 #extract gene names
 salgenes_inter_names <- gff_df %>%
@@ -521,6 +522,80 @@ salgenes_list_combined <- salgenes_list_combined %>%
   left_join(lfc_WH_t2, by = "TRINITY")
 
 write.csv(salgenes_list_combined, "Salinity_genes_table_lfc-uniq.csv", row.names=FALSE, quote=TRUE)
+
+#create plot for up and down regulated genes
+#log2 fold > 0 and < 0
+res_SW08_sal1_up<- subset(res_SW08_sal1, padj < 0.05 & log2FoldChange > 0)
+salgenes1_SW08_up <- rownames(res_SW08_sal1_up)#181
+
+res_SW08_sal1_down<- subset(res_SW08_sal1, padj < 0.05 & log2FoldChange < 0)
+salgenes1_SW08_down <- rownames(res_SW08_sal1_down)#26
+
+res_SW08_sal2_up<- subset(res_SW08_sal2, padj < 0.05 & log2FoldChange > 0)
+salgenes2_SW08_up <- rownames(res_SW08_sal2_up)#168
+
+res_SW08_sal2_down<- subset(res_SW08_sal2, padj < 0.05 & log2FoldChange < 0)
+salgenes2_SW08_down <- rownames(res_SW08_sal2_down)#71
+
+res_WH_sal1_up <- subset(res_WH_sal1, padj < 0.05 & log2FoldChange > 0)
+salgenes1_WH_up <- rownames(res_WH_sal1_up)#108
+
+res_WH_sal1_down <- subset(res_WH_sal1, padj < 0.05 & log2FoldChange < 0)
+salgenes1_WH_down <- rownames(res_WH_sal1_down)#57
+
+res_WH_sal2_up <- subset(res_WH_sal2, padj < 0.05 & log2FoldChange > 0)
+salgenes2_WH_up <- rownames(res_WH_sal2_up)#118
+
+res_WH_sal2_down <- subset(res_WH_sal2, padj < 0.05 & log2FoldChange < 0)
+salgenes2_WH_down <- rownames(res_WH_sal2_down)#252
+#subtract purely time-sensitive genes
+salgenes_1_SW08_up <- setdiff(salgenes1_SW08_up, timegenes_SW08)#164
+salgenes_1_SW08_down <- setdiff(salgenes1_SW08_down, timegenes_SW08)#22
+salgenes_2_SW08_up <- setdiff(salgenes2_SW08_up, timegenes_SW08)#140
+salgenes_2_SW08_down <- setdiff(salgenes2_SW08_down, timegenes_SW08)#61
+
+salgenes_1_WH_up <- setdiff(salgenes1_WH_up, timegenes_WH)#96
+salgenes_1_WH_down <- setdiff(salgenes1_WH_down, timegenes_WH)#48
+salgenes_2_WH_up <- setdiff(salgenes2_WH_up, timegenes_WH)#104
+salgenes_2_WH_down <- setdiff(salgenes2_WH_down, timegenes_WH)#195
+
+#build sets
+salgenes_1_inter_up <- intersect(salgenes_1_SW08_up, salgenes_1_WH_up)#71
+salgenes_1_inter_down <- intersect(salgenes_1_SW08_down, salgenes_1_WH_down)#8
+salgenes_2_inter_up <- intersect(salgenes_2_SW08_up, salgenes_2_WH_up)#62
+salgenes_2_inter_down <- intersect(salgenes_2_SW08_down, salgenes_2_WH_down)#29
+
+salgenes_1_SW08_u_up <- setdiff(salgenes_1_SW08_up, salgenes_1_inter_up)#93
+salgenes_1_SW08_u_down <- setdiff(salgenes_1_SW08_down, salgenes_1_inter_down)#14
+salgenes_2_SW08_u_up <- setdiff(salgenes_2_SW08_up, salgenes_2_inter_up)#78
+salgenes_2_SW08_u_down <- setdiff(salgenes_2_SW08_down, salgenes_2_inter_down)#32
+
+salgenes_1_WH_u_up <- setdiff(salgenes_1_WH_up, salgenes_1_inter_up)#25
+salgenes_1_WH_u_down <- setdiff(salgenes_1_WH_down, salgenes_1_inter_down)#40
+salgenes_2_WH_u_up <- setdiff(salgenes_2_WH_up, salgenes_2_inter_up)#42
+salgenes_2_WH_u_down <- setdiff(salgenes_2_WH_down, salgenes_2_inter_down)#166
+
+#build dataframe for plotting
+up_down <- data.frame(
+  Station = c("Baltic", "Baltic", "North", "North", "Shared", "Shared"),
+  time = c("t1", "t2", "t1", "t2", "t1", "t2"),
+  up = c(93, 78, 25, 42, 71, 62),
+  down = c(14, 32, 40, 166, 8, 29)
+)
+
+up_down_long <- up_down %>%
+  pivot_longer(cols = c(up, down), names_to = "Direction", values_to = "Count") %>%
+  mutate(Count = ifelse(Direction == "down", -Count, Count))
+
+up_down_long$Station <- factor(up_down_long$Station, levels = c("Shared", "Baltic", "North"))
+
+ggplot(up_down_long, aes(x = time, y = Count, fill = Direction)) +
+  geom_bar(stat = "identity", position = "identity") +
+  facet_wrap(~ Station) +
+  scale_y_continuous(labels = abs) +
+  labs(y = "Number of Genes", x = "Time Point") +
+  scale_fill_manual(values = c("up" = "firebrick", "down" = "steelblue")) +
+  theme_minimal()
 
 # visualize pairwise comparison sets ####
 #visualize with heatmaps
