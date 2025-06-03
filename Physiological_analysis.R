@@ -11,7 +11,7 @@ library(readxl)
 library(lme4)
 library(olsrr)
 
-setwd("~/Documents/Experiments/Physiology_SW08-WH/")
+#setwd("~/Documents/Experiments/Physiology_SW08-WH/")
 setwd("~/SalAdapt_transcriptomics/data/")
 
 ####acute survival####
@@ -228,7 +228,7 @@ par(mfrow = c(1,1))
 durbinWatsonTest(stat_hatch)#no autocorrelation if p > 0.05
 
 ####length - conversion factors ####
-dat_length <- read_excel("~/Downloads/Acartia_ImageJ_WH_SW08.xlsx")
+#dat_length <- read_excel("~/Downloads/Acartia_ImageJ_WH_SW08.xlsx")
 dat_length <- read.csv("Length_all.csv", sep = ";")
 
 #calculate mean length per animal 
@@ -244,12 +244,14 @@ dat_length_m <- dat_length %>%
 dat_length_m <- dat_length_m %>%
   filter(File_name != "") 
 
-ggplot(dat_length_m, aes(x = Station, y = Mean_Length, color = Month))+
+ggplot(dat_length_m, aes(x = Station, y = Mean_Length, col = Station))+
   geom_boxplot()+
+  scale_color_manual(values = my_colors)+
   geom_point(alpha = 0.2)+
-  facet_wrap(~Treatment_PSU)
+  facet_wrap(~Treatment)+
+  theme_light()
 
-#calculate mean length per station and treament to standardise
+#calculate mean length per station and treatment to standardize
 dat_length_m <- dat_length_m %>%
   group_by(Station, Treatment_PSU, Month) %>%
   mutate(Mean_Group = mean(Mean_Length))
@@ -276,7 +278,7 @@ conversion_factors <- conversion_factors %>%
 dat_resp_long <- read.csv("Respiration_long.csv", sep = ";")
 
 #calculate variables
-dat_resp_long$O2_final <- dat_resp_long$Oxygen/dat_resp_long$Individuals
+dat_resp_long$O2_final <- dat_resp_long$Oxygen_umol.h/dat_resp_long$Individuals
 dat_resp_long$Salinity <- as.factor(dat_resp_long$Salinity)
 dat_resp_long$Station <- factor(dat_resp_long$Station, levels = c("WH","SW08"))
 dat_resp_long <- dat_resp_long %>%
@@ -284,7 +286,7 @@ dat_resp_long <- dat_resp_long %>%
 
 dat_resp_long <- dat_resp_long %>%
   left_join(conversion_factors, by = "Group") %>%
-  mutate(Oxygen_adjusted = O2_final/Weight)
+  mutate(Oxygen_adjusted = (O2_final/Weight)*1000)#convert to mg body weight instead of ug
 
 #per dry body weight (in ug)
 #SW08 - 15: 13.08976
@@ -292,13 +294,13 @@ dat_resp_long <- dat_resp_long %>%
 #WH - 15: 13.29447
 #WH - 5: 13.57943
 
-#uL O2
-ggplot(dat_resp_long, aes(x = factor(Station.x), y = Oxygen, fill = factor(Station.x))) +
+#umol O2
+ggplot(dat_resp_long, aes(x = factor(Station.x), y = O2_final, fill = factor(Station.x))) +
   theme_light()+
   facet_wrap(~Salinity, labeller = labeller(Salinity = c("5" = "5 PSU", "15" = "15 PSU")))+
   theme(strip.background =element_rect(fill="white"))+
   theme(strip.text = element_text(colour = 'black', size = 12))+
-  labs(x = "Station", y = "uL o2 h-1 ind-1") +
+  labs(x = "Station", y = "umol O2 h-1 ind-1") +
   geom_boxplot(alpha = 0.2, outlier.shape = NA)+
   geom_point(aes(color = factor(Station.x)), position = position_jitter(width = 0.15), size = 2)+
   scale_fill_manual(values = c("#DE3C22", "#83B3C2"), guide = "none") +  # Specify blue and orange colors for fill without legend
@@ -310,7 +312,7 @@ ggplot(dat_resp_long, aes(x = factor(Station.x), y = Oxygen_adjusted, fill = fac
   facet_wrap(~Salinity, labeller = labeller(Salinity = c("5" = "5 PSU", "15" = "15 PSU")))+
   theme(strip.background =element_rect(fill="white"))+
   theme(strip.text = element_text(colour = 'black', size = 12))+
-  labs(x = "Station", y = "uL o2 h-1 ug dry weight-1") +
+  labs(x = "Station", y = "umol O2 h-1 mg dry weight-1") +
   geom_boxplot(alpha = 0.2, outlier.shape = NA)+
   geom_point(aes(color = factor(Station.x)), position = position_jitter(width = 0.15), size = 2)+
   scale_fill_manual(values = c("#DE3C22", "#83B3C2"), guide = "none") +  # Specify blue and orange colors for fill without legend
@@ -334,35 +336,35 @@ par(mfrow = c(1,1))
 dat_resp_short <- read.csv("Respiration_short.csv", sep = ";")
 
 #calculate variables
-dat_resp_short$O2_final <- dat_resp_short$Oxygen/dat_resp_short$Individuals
-dat_resp_short$Salinity <- as.factor(dat_resp_short$Salinity)
+dat_resp_short$O2_final <- dat_resp_short$Oxygen_umol.h/dat_resp_short$Individuals
+dat_resp_short$Treatment_PSU <- as.factor(dat_resp_short$Treatment_PSU)
 dat_resp_short$Station <- factor(dat_resp_short$Station, levels = c("WH","SW08"))
 dat_resp_short <- dat_resp_short %>%
-  mutate(Group = paste(Station, Salinity, Month, sep = "_"))
+  mutate(Group = paste(Station, Treatment_PSU, Month, sep = "_"))
 
 dat_resp_short <- dat_resp_short %>%
   left_join(conversion_factors, by = "Group") %>%
-  dplyr::mutate(Oxygen_adjusted = O2_final/Weight)
+  dplyr::mutate(Oxygen_adjusted = (O2_final/Weight)*1000)
 
-#uL O2
-ggplot(dat_resp_short, aes(x = factor(Salinity), y = Oxygen, fill = factor(Station.x))) +
+#umol O2
+ggplot(dat_resp_short, aes(x = factor(Treatment_PSU.x), y = O2_final, fill = factor(Station.x))) +
   theme_light()+
   facet_wrap(~Station.x)+
   theme(strip.background =element_rect(fill="white"))+
   theme(strip.text = element_text(colour = 'black', size = 12))+
-  labs(x = "Salinity [PSU]", y = "uL o2 h-1 ind-1") +
+  labs(x = "Salinity [PSU]", y = "umol o2 h-1 ind-1") +
   geom_boxplot(alpha = 0.2, outlier.shape = NA)+
   geom_point(aes(color = factor(Station.x)), position = position_jitter(width = 0.15), size = 2)+
   scale_fill_manual(values = c("#DE3C22", "#83B3C2"), guide = "none") +  # Specify blue and orange colors for fill without legend
   scale_color_manual(values = c("#DE3C22", "#83B3C2"))
 
 #adjusted for dry body weight
-ggplot(dat_resp_short, aes(x = factor(Salinity), y = Oxygen_adjusted, fill = factor(Station.x))) +
+ggplot(dat_resp_short, aes(x = factor(Treatment_PSU.x), y = Oxygen_adjusted, fill = factor(Station.x))) +
   theme_light()+
   facet_wrap(~Station.x)+
   theme(strip.background =element_rect(fill="white"))+
   theme(strip.text = element_text(colour = 'black', size = 12))+
-  labs(x = "Salinity [PSU]", y = "uL o2 h-1 ug dry weight-1") +
+  labs(x = "Salinity [PSU]", y = "umol o2 h-1 mg dry weight-1") +
   geom_boxplot(alpha = 0.2, outlier.shape = NA)+
   geom_point(aes(color = factor(Station.x)), position = position_jitter(width = 0.15), size = 2)+
   scale_fill_manual(values = c("#DE3C22", "#83B3C2"), guide = "none") +  # Specify blue and orange colors for fill without legend
@@ -371,10 +373,10 @@ ggplot(dat_resp_short, aes(x = factor(Salinity), y = Oxygen_adjusted, fill = fac
 #summary and stats
 hist(dat_resp_short$Oxygen_adjusted, breaks = 15)
 dat_resp_short %>%
-  group_by(Salinity, Station.x) %>%
+  group_by(Treatment_PSU.x, Station.x) %>%
   summarise(Mean = mean(Oxygen_adjusted), SD = sd(Oxygen_adjusted)) 
 
-stat_resp_short <- aov(Oxygen_adjusted ~ Station.x*Salinity, data = dat_resp_short)
+stat_resp_short <- aov(Oxygen_adjusted ~ Station.x*Treatment_PSU.x, data = dat_resp_short)
 summary(stat_resp_short)# sig diff for salinity not station
 
 #check residuals
