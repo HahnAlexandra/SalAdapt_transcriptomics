@@ -55,10 +55,17 @@ coords<-data.frame(site = c("SW08", "WH"),
                     lat=c(54.413000,53.513000))
 
 #plot sampling coordinates on mean salinity map
-ggplot() + 
-  geom_raster(data = r_df_long, aes(x = x, y = y, fill = mean_salinity), alpha = 0.55) +
-  scale_fill_paletteer_c("grDevices::Blue-Red", name = "Salinity",
-                         values = c(0, 0.5, 0.8, 1)) +
+
+transparent_palette <- alpha(paletteer::paletteer_c("grDevices::Blue-Red", n = 256), 0.55)
+
+#plot map
+map <- ggplot() +
+  geom_raster(data = r_df_long, aes(x = x, y = y, fill = mean_salinity)) +
+  scale_fill_gradientn(
+    colors = transparent_palette,
+    name = "Salinity",
+    limits = range(r_df_long$mean_salinity, na.rm = TRUE)
+  ) +
   geom_sf(data = world, fill = "white", color = "black") +
   theme_light(base_size = 17) +
   annotation_scale(location = "bl") +
@@ -66,6 +73,7 @@ ggplot() +
   geom_point(data = coords, aes(x = lon, y = lat, color = site) , size = 3, 
              shape = 16)+
   ylab("Latitude")+ xlab("Logitude")
+
 
 #### stats sampling locations ####
 #only look at sampling locations
