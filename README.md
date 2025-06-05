@@ -6,5 +6,5 @@ Physiology_analysis.R contains script for analysing physiological data, find dat
 
 Transcriptomic_analysis.R contains script for analysing pre-processed transcriptomic data, find fq files on NCBI PRJNA1258960, find scripts for data processing in [/scripts](/scripts)
 
-Archived on Zenodo:  DOI: [https://doi.org/10.5281/zenodo.15535307](https://doi.org/10.5281/zenodo.15535307)
+Archived on Zenodo:  DOI: [10.5281/zenodo.15535306](https://doi.org/10.5281/zenodo.15535306)
 
