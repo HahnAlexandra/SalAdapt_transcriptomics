@@ -67,12 +67,10 @@ LD50 <- dat_acute %>% group_by(Station, Original_sal, Time, Replicate) %>%
   do(get_LD50(glm(Active ~ Treatment_sal, family = "binomial", data = .)))
 
 LD50_min_max <- LD50 %>%
-  filter(Replicate != 4)%>%
   group_by(Station, Time)%>%
   summarise(Min = min(LD50), Max = max(LD50))
 
 LD50_mean <- LD50 %>%
-  filter(Replicate != 4)%>%
   group_by(Station, Original_sal, Time)%>%
   summarise(Mean = mean(LD50), SD = sd(LD50))%>%
   left_join(LD50_min_max, by = c("Station", "Time"))
