@@ -8,3 +8,5 @@ Transcriptomic_analysis.R contains script for analysing and creating figures for
 
 Archived on Zenodo:  DOI: [10.5281/zenodo.15535306](https://doi.org/10.5281/zenodo.15535306)
 
+Preprint on bioRxiv: [link](https://www.biorxiv.org/content/10.1101/2025.06.12.659303v1)
+
