@@ -15,7 +15,7 @@ library(olsrr)
 setwd("~/SalAdapt_transcriptomics/data/")
 
 ####acute survival####
-dat_acute <- read.csv("Acute_sal_24.csv", sep = ";")
+dat_acute <- read.csv("Acute_sal.csv", sep = ";")
 
 dat_acute$Time_factor <- as.factor(dat_acute$Time)
 dat_acute$Station <- factor(dat_acute$Station, 
@@ -31,9 +31,8 @@ m <- glm(Active ~ Station*Time*Treatment_factor , family = binomial(), data = da
 summary(m)
 anova(m, test = "Chisq")
 
-#subset 2 and 24 h
+#only include data below 15 PSU in plot
 log_data_24 <- dat_acute %>%
-  filter(Time <= 24)%>%
   filter(Treatment_sal < 15)
 
 #plot
